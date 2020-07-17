@@ -291,6 +291,9 @@ class SkypeClient:
         if newEvent:
             convStatus = self._searchResponse(newEvent, 'sender', 'state')
 
+            if convStatus == 'Disconnected':
+                raise Exception('User is offline')
+
             # Check if the conversation is still connecting
             while convStatus == 'Connecting':
                 newEvent = self._updateEvents()
