@@ -287,34 +287,36 @@ class SkypeClient:
         self._httpRequestHelper('POST', msgURL, data)
         # the Event url should be update on each call once the conversation has been opened
         newEvent = self._updateEvents()
-        convStatus = self._searchResponse(newEvent, 'sender', 'state')
 
-        # Check if the conversation is still connecting
-        while convStatus == 'Connecting':
-            newEvent = self._updateEvents()
+        if newEvent:
             convStatus = self._searchResponse(newEvent, 'sender', 'state')
-            time.sleep(1)  # Wait for a short time and check if it has connected
 
-        # Check the status of the conversation for errors
-        for item in newEvent["sender"]:
-            for keyword in item["events"]:
-                if 'status' in keyword:
-                    state = keyword['status']
-                else:
-                    state = None
+            # Check if the conversation is still connecting
+            while convStatus == 'Connecting':
+                newEvent = self._updateEvents()
+                convStatus = self._searchResponse(newEvent, 'sender', 'state')
+                time.sleep(1)  # Wait for a short time and check if it has connected
 
-        # If a successful connection is established, store the urls for communication
-        if state == 'Success':
-            print('Success')
+            # Check the status of the conversation for errors
             for item in newEvent["sender"]:
-                for x in item["events"]:
-                    if "_embedded" in x and "messaging" in x["_embedded"]:
-                        messageOptions = x["_embedded"]["messaging"]["_links"]
+                for keyword in item["events"]:
+                    if 'status' in keyword:
+                        state = keyword['status']
                     else:
-                        continue
-        else:
-            print('Server error - {}'.format(state))
-        print(messageOptions)
+                        state = None
+
+            # If a successful connection is established, store the urls for communication
+            if state == 'Success':
+                print('Success')
+                for item in newEvent["sender"]:
+                    for x in item["events"]:
+                        if "_embedded" in x and "messaging" in x["_embedded"]:
+                            messageOptions = x["_embedded"]["messaging"]["_links"]
+                        else:
+                            continue
+            else:
+                print('Server error - {}'.format(state))
+            print(messageOptions)
         return messageOptions if messageOptions else None
 
     def Message(self, messageOptions, option, text=None):
@@ -339,6 +341,9 @@ class SkypeClient:
     def GetMessage(self):
         # Open the Event channel and store the data
         rel = self._updateEvents()
+
+        if not rel:
+            return None
         # Return a dictionary containing information about the last incoming message
         return self.processEvent(rel)
 
@@ -513,6 +518,10 @@ class SkypeClient:
     def _updateEvents(self):
         url = self.rootDomain + self.eventURL
         eventLog = self._httpRequestHelper('GET', url)
+
+        if not eventLog:
+            return None
+
         eventLog = json.loads(eventLog)
         self.eventURL = eventLog["_links"]["next"]["href"]
 
