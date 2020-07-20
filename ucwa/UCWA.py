@@ -10,10 +10,16 @@ if not debug:
     print = lambda *a, **k: None
 
 class SkypeClient:
-    def __init__(self, domain, userID, userPWD, EndpointId):
+    def __init__(self, domain, userID, userPWD, EndpointId, autodiscover=True):
         domain = self._prepareDomain(domain)
         print(domain)
-        self.discoveryURL = 'https://lyncdiscover.{}'.format(domain)
+
+        if autodiscover:
+            self.discoveryURL = 'https://lyncdiscover.{}'.format(domain)
+            self.rootDomain = None
+        else:
+            self.rootDomain = 'https://{}'.format(domain)
+
         self.userID = userID
         self.userPWD = userPWD
         self.UserAgent = 'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)'
@@ -25,7 +31,6 @@ class SkypeClient:
         self.peopleTasks = {}
         self.meetingTasks = {}
         self.communicationTasks = {}
-        self.rootDomain = None
         self.eventURL = None
         self.headers = {}
 
@@ -39,20 +44,28 @@ class SkypeClient:
     def StartApplication(self):
         """ Begin the application resource """
 
-        # 1. GET on the autodiscover server and grab 'user' URL
-        userURLs = self._getUser()
-        matchString = 'https?:\/\/(?:[^\/]+)|^(.*)$'
-        self.rootDomain = re.search(matchString, userURLs["_links"]["user"]["href"]).group(0)
-        # 2. GET on the 'user' URL
-        authURL = self._authUser(userURLs["_links"]["user"]["href"])
-        # 3. POST to Oauth with credentials (token in last step)
-        if not self.oauthToken:
-            self.oauthToken = self._getToken(authURL)
-            # 4. GET as in 2., but this time with token. Grab the applications URL
-            self.authResponse = json.loads(self._authUser(userURLs["_links"]["user"]["href"]))
+        if not self.rootDomain:
+            # 1. GET on the autodiscover server and grab 'user' URL
+            userURLs = self._getUser()
+            matchString = 'https?:\/\/(?:[^\/]+)|^(.*)$'
+            self.rootDomain = re.search(matchString, userURLs["_links"]["user"]["href"]).group(0)
+            # 2. GET on the 'user' URL
+            authURL = self._authUser(userURLs["_links"]["user"]["href"])
+            # 3. POST to Oauth with credentials (token in last step)
+            if not self.oauthToken:
+                self.oauthToken = self._getToken(authURL)
+                # 4. GET as in 2., but this time with token. Grab the applications URL
+                self.appURL = json.loads(self._authUser(authURL))["_links"]["applications"]["href"]
+        else:
+            authURL = '{}/WebTicket/oauthtoken'.format(self.rootDomain)
+            self.appURL = '{}/ucwa/oauth/v1/applications'.format(self.rootDomain)
+
+            if not self.oauthToken:
+                self.oauthToken = self._getToken(authURL)
+
         # 5. POST to the applications URL and it should return application.
         appData = {'UserAgent':self.UserAgent, 'EndpointId':self.EndpointId, 'Culture':"en-US"}
-        self.createdApplication = json.loads(self._httpRequestHelper('POST', self.authResponse["_links"]["applications"]["href"], appData))
+        self.createdApplication = json.loads(self._httpRequestHelper('POST', self.appURL, appData))
         # Store the created data into manageable dictionaries we can point to the main application
         #print(self.createdApplication)
         self.UserName = self.createdApplication["_embedded"]["me"]['name']
