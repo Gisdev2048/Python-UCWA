@@ -459,11 +459,13 @@ class SkypeClient:
         except error.HTTPError as err:
             data = self._handleExceptionResponse(err, url)
         except error.URLError as err:
-            raise Exception('The server timed out: {}'.format(err.reason))
+            self.print('The server timed out: {}'.format(err.reason))
         except UnicodeDecodeError:
             data = self._httpRequestHelper(method, url, payload)
         except Exception as err:
-            raise Exception('An unknown error occurred: {}'.format(err))
+            self.print('An unknown error occurred: {}'.format(err))
+        finally:
+            return data if data else None
 
     def _handleExceptionResponse(self, err, url):
         code = err.code
@@ -475,7 +477,7 @@ class SkypeClient:
         elif not self.createdApplication and code == 500:
             return self._updateTokenDomain(url)
         else:
-            raise Exception('HTTP response error: {} - {}'.format(err.code, err.reason))
+            self.print('HTTP response error: {} - {}'.format(err.code, err.reason))
 
     def _prepareDomain(self, val):
         url = parse.urlparse(val)
