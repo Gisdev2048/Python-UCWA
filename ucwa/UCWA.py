@@ -5,14 +5,16 @@ import re
 import time
 import zlib
 
-debug = False
-if not debug:
-    print = lambda *a, **k: None
 
 class SkypeClient:
-    def __init__(self, domain, userID, userPWD, EndpointId, autodiscover=True):
+    def __init__(self, domain, userID, userPWD, EndpointId, autodiscover=True, debug=True):
+        if not debug:
+            self.print = lambda *a, **k: None
+        else:
+            self.print = print
+
         domain = self._prepareDomain(domain)
-        print(domain)
+        self.print(domain)
 
         if autodiscover:
             self.discoveryURL = 'https://lyncdiscover.{}'.format(domain)
@@ -64,21 +66,21 @@ class SkypeClient:
                 self.oauthToken = self._getToken(authURL)
 
         # 5. POST to the applications URL and it should return application.
-        appData = {'UserAgent':self.UserAgent, 'EndpointId':self.EndpointId, 'Culture':"en-US"}
+        appData = {'UserAgent': self.UserAgent, 'EndpointId': self.EndpointId, 'Culture': "en-US"}
         self.createdApplication = json.loads(self._httpRequestHelper('POST', self.appURL, appData))
         # Store the created data into manageable dictionaries we can point to the main application
-        #print(self.createdApplication)
+        # print(self.createdApplication)
         self.UserName = self.createdApplication["_embedded"]["me"]['name']
         self.meTasks = self.createdApplication["_embedded"]["me"]["_links"]
-        #print(self.meTasks)
+        # print(self.meTasks)
         self.peopleTasks = self.createdApplication["_embedded"]["people"]["_links"]
-        #print(self.peopleTasks)
+        # print(self.peopleTasks)
         self.meetingTasks = self.createdApplication["_embedded"]["onlineMeetings"]["_links"]
-        #print(self.meetingTasks)
+        # print(self.meetingTasks)
         self.communicationTasks = self.createdApplication["_embedded"]["communication"]["_links"]
-        #print(self.communicationTasks)
+        # print(self.communicationTasks)
         self.eventURL = self.createdApplication["_links"]["events"]["href"]
-        print('Event URL, ', self.eventURL) # Proof the application was created
+        self.print('Event URL, ', self.eventURL)  # Proof the application was created
         if 'makeMeAvailable' in self.meTasks:
             self.makeMeAvailable()
 
@@ -120,10 +122,10 @@ class SkypeClient:
     def getLocation(self):
         url = self.rootDomain + self.meTasks['location']['href']
         request = json.loads(self._httpRequestHelper('GET', url))
-        print(request)
+        self.print(request)
         return request['location']
 
-    def setLocation(self, location): # Has not been tested
+    def setLocation(self, location):  # Has not been tested
         url = self.rootDomain + self.meTasks['location']['href']
         data = {'location': location}
         self._httpRequestHelper('POST', url, data)
@@ -142,7 +144,7 @@ class SkypeClient:
         url = self.rootDomain + self.meTasks['presence']['href']
         return json.loads(self._httpRequestHelper('GET', url))['availability']
 
-    def setPresence(self, value): # Need to add some form of check for MakeMeAvailable
+    def setPresence(self, value):  # Need to add some form of check for MakeMeAvailable
         values = ['Away', 'BeRightBack', 'Busy', 'DoNotDisturb', 'Offwork', 'Online']
 
         if value in values:
@@ -163,27 +165,28 @@ class SkypeClient:
         # Clear Contact list if there was already data
         if len(self.ContactsList) > 0: del self.ContactsList[:]
 
-        url =self.rootDomain + self.peopleTasks['myContacts']['href']
+        url = self.rootDomain + self.peopleTasks['myContacts']['href']
         contactResults = json.loads(self._httpRequestHelper('GET', url))['_embedded']['contact']
-        print(contactResults)
+        self.print(contactResults)
         for contact in contactResults:
             try:
                 card = {'name': contact['name'],
                         'title': contact['title'] if 'title' in contact else None,
-                        'department': contact['department']if 'department' in contact else None,
-                        'extention': self.processNumber(contact['workPhoneNumber']) if 'workPhoneNumber' in contact else None,
-                        'presence': self.rootDomain + contact['_links']['contactPresence']['href'] if 'contactPresence' in contact else None,
-                        'email': contact['emailAddresses'][0]if 'emailAddresses' in contact else None,
+                        'department': contact['department'] if 'department' in contact else None,
+                        'extention': self.processNumber(
+                            contact['workPhoneNumber']) if 'workPhoneNumber' in contact else None,
+                        'presence': self.rootDomain + contact['_links']['contactPresence'][
+                            'href'] if 'contactPresence' in contact else None,
+                        'email': contact['emailAddresses'][0] if 'emailAddresses' in contact else None,
                         'mobile': contact['mobilePhoneNumber'] if 'mobilePhoneNumber' in contact else None
                         }
 
                 self.ContactsList.append(card)
             except Exception as e:
-                print(e)
-                print(contact)
-                
+                self.print(e)
+                self.print(contact)
+
         return self.ContactsList
-                
 
     def myContactsAndGroupSubscription(self):
         pass
@@ -213,12 +216,13 @@ class SkypeClient:
     # Search Directory for incoming call number
     def incomingCallSearch(self, text):
         text = text.replace(' ', '%20')  # Convert Space to hex for the url
-        url = self.rootDomain + self.peopleTasks['search']['href']+'?query='+text+'&limit='+str(2)  # Format URL
+        url = self.rootDomain + self.peopleTasks['search']['href'] + '?query=' + text + '&limit=' + str(2)  # Format URL
 
         # Returned Data
         searchResult = json.loads(self._httpRequestHelper('GET', url))['_embedded']['contact']
 
-        contactData = json.loads(self._httpRequestHelper('GET', self.rootDomain + searchResult[1]['_links']['self']['href']))
+        contactData = json.loads(
+            self._httpRequestHelper('GET', self.rootDomain + searchResult[1]['_links']['self']['href']))
 
         card = {'name': contactData['name'],
                 'title': contactData['title'],
@@ -234,25 +238,26 @@ class SkypeClient:
     def search(self, text, limit=10):
         del self.SearchResults[:]  # Clears the Search Result List
         text = text.replace(' ', '%20')  # Convert Space to hex for the url
-        url = self.rootDomain + self.peopleTasks['search']['href']+'?query='+text+'&limit='+str(limit)  # Format URL
+        url = self.rootDomain + self.peopleTasks['search']['href'] + '?query=' + text + '&limit=' + str(
+            limit)  # Format URL
 
         # Returned Data
         searchResult = json.loads(self._httpRequestHelper('GET', url))['_embedded']['contact']
 
         for contact in searchResult:
-
-            contactData = json.loads(self._httpRequestHelper('GET', self.rootDomain + contact['_links']['self']['href']))
+            contactData = json.loads(
+                self._httpRequestHelper('GET', self.rootDomain + contact['_links']['self']['href']))
 
             card = {'name': contactData['name'],
                     'title': contactData['title'] if 'title' in contactData else None,
                     'department': contactData['department'] if 'department' in contactData else None,
-                    'extention': self.processNumber(contact['workPhoneNumber']) if 'workPhoneNumber' in contactData else None,
+                    'extention': self.processNumber(
+                        contact['workPhoneNumber']) if 'workPhoneNumber' in contactData else None,
                     'presence': self.rootDomain + contactData['_links']['contactPresence']['href'],
                     'email': contactData['emailAddresses'][0] if 'email' in contactData else None,
                     'mobile': contactData['mobilePhoneNumber'] if 'mobilePhoneNumber' in contactData else None
                     }
             self.SearchResults.append(card)
-
 
     def subscribedContacts(self):
         pass
@@ -260,7 +265,7 @@ class SkypeClient:
     # Online Meeting Task Section
     def myOnlineMeetings(self):
         url = self.rootDomain + self.meetingTasks['myOnlineMeetings']['href']
-        print(url)
+        self.print(url)
         # single = json.loads(self._httpRequestHelper('GET', url))['_embedded']['myAssignedOnlineMeeting'][0]['_links']['self']['href']
         # return self._httpRequestHelper('GET', self.rootDomain + single)
         return json.loads(self._httpRequestHelper('GET', url))['_embedded']['myOnlineMeeting']
@@ -287,14 +292,14 @@ class SkypeClient:
         messageOptions = None
         # Create a context for this conversation if none is provided. This is an arbitrary 6-digit str
         if not context:
-            context = str(randint(10**(6-1), (10**6)-1))
+            context = str(randint(10 ** (6 - 1), (10 ** 6) - 1))
         data = {
-            "importance":"Normal",
-            "sessionContext":context,
-            "subject":"IM from{}".format(self.UserName),
-            "telemetryId":None,
-            "to":"sip:{}".format(sip),
-            "operationId":self.EndpointId
+            "importance": "Normal",
+            "sessionContext": context,
+            "subject": "IM from{}".format(self.UserName),
+            "telemetryId": None,
+            "to": "sip:{}".format(sip),
+            "operationId": self.EndpointId
         }
         msgURL = self.rootDomain + self.communicationTasks["startMessaging"]["href"]
         self._httpRequestHelper('POST', msgURL, data)
@@ -323,7 +328,7 @@ class SkypeClient:
 
             # If a successful connection is established, store the urls for communication
             if state == 'Success':
-                print('Success')
+                self.print('Success')
                 for item in newEvent["sender"]:
                     for x in item["events"]:
                         if "_embedded" in x and "messaging" in x["_embedded"]:
@@ -331,8 +336,8 @@ class SkypeClient:
                         else:
                             continue
             else:
-                print('Server error - {}'.format(state))
-            print(messageOptions)
+                self.print('Server error - {}'.format(state))
+            self.print(messageOptions)
         return messageOptions if messageOptions else None
 
     def Message(self, messageOptions, option, text=None):
@@ -340,7 +345,7 @@ class SkypeClient:
             These are: sendMessage, stopMessaging, conversation, and self"""
 
         url = self.rootDomain + messageOptions[option]["href"]
-        print("url, ", url)
+        self.print("url, ", url)
         headers = {'Content-Type': "text/plain",
                    'Accept': "application/json",
                    'Authorization': "Bearer {}".format(self.oauthToken)}
@@ -441,7 +446,7 @@ class SkypeClient:
                 self.headers['Content-Type'] = "application/x-www-form-urlencoded;charset='utf-8'"
         else:
             if 'Accept-Encoding' not in self.headers: self.headers['Accept-Encoding'] = "gzip, deflate"
-        if payload and not isinstance(payload, bytes): # Prepare the payload, if it exists
+        if payload and not isinstance(payload, bytes):  # Prepare the payload, if it exists
             payload = payload.encode()
         myRequest = request.Request(url, data=payload, headers=self.headers, method=method)
         try:
@@ -450,7 +455,7 @@ class SkypeClient:
                     data = response.read().decode()
                 else:
                     data = zlib.decompress(response.read(), 16 + zlib.MAX_WBITS).decode()
-                #print(data.decode())
+                # print(data.decode())
         except error.HTTPError as err:
             data = self._handleExceptionResponse(err, url)
         except error.URLError as err:
@@ -467,7 +472,7 @@ class SkypeClient:
         if code == 401:
             return self._authHandler(err)
         elif code == 404:
-            print('Updating application')
+            self.print('Updating application')
             return self._updateApplication()
         elif not self.createdApplication and code == 500:
             return self._updateTokenDomain(url)
@@ -506,7 +511,8 @@ class SkypeClient:
         tokenurl = self.rootDomain + '/WebTicket/oauthtoken'
         self.oauthToken = self._getToken(tokenurl)
         appData = json.dumps({'UserAgent': self.UserAgent, 'EndpointId': self.EndpointId, 'Culture': "en-US"})
-        headers = {'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': 'Bearer {}'.format(self.oauthToken)}
+        headers = {'Content-Type': 'application/json', 'Accept': 'application/json',
+                   'Authorization': 'Bearer {}'.format(self.oauthToken)}
         myRequest = request.Request(url, data=appData.encode(), headers=headers, method='POST')
         with request.urlopen(myRequest) as response:
             data = response.read().decode()
@@ -541,7 +547,7 @@ class SkypeClient:
         eventLog = json.loads(eventLog)
         self.eventURL = eventLog["_links"]["next"]["href"]
 
-        print(eventLog)
+        self.print(eventLog)
         return eventLog
 
     def _decodeResponse(self, string):
