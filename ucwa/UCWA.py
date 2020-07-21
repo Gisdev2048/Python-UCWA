@@ -464,8 +464,6 @@ class SkypeClient:
             data = self._httpRequestHelper(method, url, payload)
         except Exception as err:
             raise Exception('An unknown error occurred: {}'.format(err))
-        finally:
-            return data if data else None
 
     def _handleExceptionResponse(self, err, url):
         code = err.code
