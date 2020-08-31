@@ -455,7 +455,7 @@ class SkypeClient:
                     data = response.read().decode()
                 else:
                     data = zlib.decompress(response.read(), 16 + zlib.MAX_WBITS).decode()
-                # print(data.decode())
+                print(data.decode())
         except error.HTTPError as err:
             data = self._handleExceptionResponse(err, url)
         except error.URLError as err:
