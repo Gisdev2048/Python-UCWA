@@ -494,15 +494,24 @@ class SkypeClient:
         return self._httpRequestHelper('GET', url=url)
 
     def _getToken(self, url):
-        loginData = parse.urlencode({
-            "charset": "UTF-8",
-            "grant_type": "password",
-            "username": self.userID,
-            "password": self.userPWD
-        })
-        loginData = loginData.encode()
-        token = json.loads(self._httpRequestHelper('POST', url, loginData))
-        return token["access_token"]
+        try:
+            self.print('Trying to get token')
+            loginData = parse.urlencode({
+                "charset": "UTF-8",
+                "grant_type": "password",
+                "username": self.userID,
+                "password": self.userPWD
+            })
+            loginData = loginData.encode()
+            self.print('Login data: {}'.format(loginData))
+
+            token = json.loads(self._httpRequestHelper('POST', url, loginData))
+            self.print('Token: {}'.format(token))
+
+            return token["access_token"]
+        except Exception as err:
+            self.print('Error while getting token. {}'.format(err))
+            return None
 
     def _updateTokenDomain(self, url):
         # Don't recall the request with the HTTP helper method here in case there is an actual 500 error (it will loop)
