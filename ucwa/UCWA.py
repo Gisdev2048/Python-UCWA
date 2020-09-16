@@ -448,6 +448,8 @@ class SkypeClient:
             if 'Accept-Encoding' not in self.headers: self.headers['Accept-Encoding'] = "gzip, deflate"
         if payload and not isinstance(payload, bytes):  # Prepare the payload, if it exists
             payload = payload.encode()
+
+        self.print('Request data: {}'.format(str(payload)))
         myRequest = request.Request(url, data=payload, headers=self.headers, method=method)
         try:
             with request.urlopen(myRequest) as response:
@@ -455,7 +457,6 @@ class SkypeClient:
                     data = response.read().decode()
                 else:
                     data = zlib.decompress(response.read(), 16 + zlib.MAX_WBITS).decode()
-                print(data)
         except error.HTTPError as err:
             data = self._handleExceptionResponse(err, url)
         except error.URLError as err:
@@ -465,6 +466,7 @@ class SkypeClient:
         except Exception as err:
             self.print('An unknown error occurred: {}'.format(err))
         finally:
+            self.print('Response data: {}'.format(str(data)))
             return data if data else None
 
     def _handleExceptionResponse(self, err, url):
@@ -474,7 +476,7 @@ class SkypeClient:
         elif code == 404:
             self.print('Updating application')
             return self._updateApplication()
-        elif not self.createdApplication and code == 500:
+        elif (not self.createdApplication and code == 500) or code == 403:
             return self._updateTokenDomain(url)
         else:
             self.print('HTTP response error: {} - {}'.format(err.code, err.reason))

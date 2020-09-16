@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="python-ucwa",
-    version="1.0.8",
+    version="1.0.9",
     author="jnlasher",
     description="Files for connecting to the REST API of Skype for Business",
     long_description=long_description,
